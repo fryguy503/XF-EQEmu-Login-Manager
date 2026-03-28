@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation>
+  <navigation_entry navigation_id="loginserveraccounts" display_order="700" navigation_type_id="basic" enabled="1"><![CDATA[{"link":"{{ link('login-server') }}","display_condition":"","extra_attributes":[]}]]></navigation_entry>
+</navigation>
