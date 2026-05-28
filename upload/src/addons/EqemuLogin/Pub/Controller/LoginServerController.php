@@ -176,7 +176,7 @@ class LoginServerController extends AbstractController
     protected function getCharactersByLoginAccount($loginServerId)
     {
         return $this->loginDb->fetchAll(
-            "SELECT UNIQUE
+            "SELECT DISTINCT
 			character_data.name,
 			character_data.level,
 			class_skill.name AS class_name,
@@ -205,5 +205,192 @@ class LoginServerController extends AbstractController
         );
 
         return count($accounts) > 0;
+    }
+
+    /**
+     * @param ParameterBag $params
+     * @return XF\Mvc\Reply\View
+     * @throws XF\Mvc\Reply\Exception
+     */
+    public function actionMigrateForm(ParameterBag $params)
+    {
+        $this->assertRegistrationRequired();
+
+        if (!\XF::options()->eqemuLogin_enable_migrate) {
+            return $this->error("Character migration is currently disabled.");
+        }
+
+        $characterName = $this->filter('character_name', 'string');
+
+        // Fetch character information with the account details
+        $character = $this->loginDb->fetchRow("
+            SELECT cd.*, cd.id AS char_id, cd.name AS char_name, a.lsaccount_id, a.name AS account_name
+            FROM character_data cd
+            JOIN account a ON cd.account_id = a.id
+            WHERE cd.name = ? AND cd.deleted_at IS NULL
+        ", [$characterName]);
+
+        if (empty($character)) {
+            return $this->error("Character not found.");
+        }
+
+        // Validate that user owns the login account for this character
+        $ownedLoginAccounts = $this->getLoginServerAccounts();
+        $ownedLoginAccountIds = array_column($ownedLoginAccounts, 'id');
+
+        if (empty($ownedLoginAccountIds) || !in_array($character['lsaccount_id'], $ownedLoginAccountIds)) {
+            return $this->error("Not Authorized", 401);
+        }
+
+        // Fetch all other game accounts owned by this forum user (excluding the character's current account)
+        $ownedGameAccounts = $this->loginDb->fetchAll("
+            SELECT id, name
+            FROM account
+            WHERE lsaccount_id IN (" . implode(',', array_map('intval', $ownedLoginAccountIds)) . ")
+        ");
+
+        $targetAccounts = [];
+        foreach ($ownedGameAccounts as $acct) {
+            if ($acct['id'] != $character['account_id']) {
+                $targetAccounts[] = $acct;
+            }
+        }
+
+        $viewParams = [
+            'character' => $character,
+            'targetAccounts' => $targetAccounts
+        ];
+
+        return $this->view('EqemuLogin:MigrateCharacterForm', 'migrate_character_form', $viewParams);
+    }
+
+    /**
+     * @return XF\Mvc\Reply\Error|XF\Mvc\Reply\Redirect
+     * @throws XF\Mvc\Reply\Exception
+     */
+    public function actionMigrate()
+    {
+        $this->assertPostOnly();
+        $this->assertRegistrationRequired();
+
+        if (!\XF::options()->eqemuLogin_enable_migrate) {
+            return $this->error("Character migration is currently disabled.");
+        }
+
+        $characterName = $this->filter('character_name', 'string');
+        $targetAccountId = $this->filter('target_account_id', 'int');
+
+        // Fetch character information
+        $character = $this->loginDb->fetchRow("
+            SELECT cd.*, cd.id AS char_id, cd.name AS char_name, a.lsaccount_id, a.name AS account_name
+            FROM character_data cd
+            JOIN account a ON cd.account_id = a.id
+            WHERE cd.name = ? AND cd.deleted_at IS NULL
+        ", [$characterName]);
+
+        if (empty($character)) {
+            return $this->error("Character not found.");
+        }
+
+        if ($character['account_id'] == $targetAccountId) {
+            return $this->error("Character is already on this account.");
+        }
+
+        // Fetch owned login accounts
+        $ownedLoginAccounts = $this->getLoginServerAccounts();
+        $ownedLoginAccountIds = array_column($ownedLoginAccounts, 'id');
+
+        // Fetch target game account
+        $targetAccount = $this->loginDb->fetchRow("
+            SELECT id, name, lsaccount_id FROM account WHERE id = ?
+        ", [$targetAccountId]);
+
+        if (empty($targetAccount)) {
+            return $this->error("Target account not found.");
+        }
+
+        // Validation: Must own both source login account and target login account
+        if (empty($ownedLoginAccountIds) 
+            || !in_array($character['lsaccount_id'], $ownedLoginAccountIds)
+            || !in_array($targetAccount['lsaccount_id'], $ownedLoginAccountIds)
+        ) {
+            return $this->error("Not Authorized", 401);
+        }
+
+        // Validation: Online check (using 'ingame' column from character_data schema)
+        if (isset($character['ingame']) && $character['ingame'] > 0) {
+            return $this->error("This character is currently online in-game. Please log off first.");
+        }
+
+        // Validation: Limit target account to standard maximum 8 characters
+        $targetCharCount = $this->loginDb->fetchOne("
+            SELECT COUNT(*) FROM character_data WHERE account_id = ? AND deleted_at IS NULL
+        ", [$targetAccountId]);
+
+        if ($targetCharCount >= 8) {
+            return $this->error("The target account already has the maximum of 8 characters.");
+        }
+
+        // Validation: Migration Cooldown (XenForo-side tracking)
+        $cooldownDays = \XF::options()->eqemuLogin_migrate_cooldown;
+        if ($cooldownDays > 0) {
+            $lastMigrationDate = \XF::db()->fetchOne("
+                SELECT MAX(migration_date)
+                FROM xf_eqemu_migration_log
+                WHERE user_id = ?
+            ", [$this->user->user_id]);
+
+            if ($lastMigrationDate) {
+                $cooldownSeconds = $cooldownDays * 24 * 60 * 60;
+                $elapsedSeconds = time() - $lastMigrationDate;
+
+                if ($elapsedSeconds < $cooldownSeconds) {
+                    $remainingSeconds = $cooldownSeconds - $elapsedSeconds;
+                    $remainingDays = ceil($remainingSeconds / (24 * 60 * 60));
+                    return $this->error("You can only migrate a character once every {$cooldownDays} days. You must wait {$remainingDays} more day(s).");
+                }
+            }
+        }
+
+        // Validation: Offline safety check
+        $offlineMinutes = \XF::options()->eqemuLogin_migrate_offline_duration;
+        if ($offlineMinutes > 0) {
+            $offlineSeconds = $offlineMinutes * 60;
+
+            // Check character activity using character_data.last_login (which is a Unix timestamp in this schema)
+            if (isset($character['last_login']) && $character['last_login'] > 0) {
+                $elapsed = time() - intval($character['last_login']);
+                if ($elapsed < $offlineSeconds) {
+                    $remaining = ceil(($offlineSeconds - $elapsed) / 60);
+                    return $this->error("The character was active in-game recently. Please wait {$remaining} minutes before transferring.");
+                }
+            }
+        }
+
+        // Perform migration: Update character's account association
+        try {
+            $this->loginDb->update(
+                'character_data',
+                ['account_id' => $targetAccountId],
+                'id = ?',
+                [$character['char_id']]
+            );
+
+            // Log the migration in the forum DB
+            \XF::db()->insert('xf_eqemu_migration_log', [
+                'user_id' => $this->user->user_id,
+                'character_name' => $character['char_name'],
+                'source_account_id' => $character['account_id'],
+                'target_account_id' => $targetAccountId,
+                'migration_date' => time()
+            ]);
+        } catch (\Exception $exception) {
+            return $this->error("Something went wrong during the character migration. Please try again later.", 500);
+        }
+
+        return $this->redirect(
+            $this->buildLink("login-server"),
+            "Character '{$character['char_name']}' has been successfully migrated to account '{$targetAccount['name']}'."
+        );
     }
 }

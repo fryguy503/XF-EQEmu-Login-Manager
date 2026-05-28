@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates>
-  <template type="public" title="create_account_form" version_id="1000010" version_string="1.0.0 Alpha"><![CDATA[<xf:title>Create Game Account</xf:title>
+  <template type="public" title="create_account_form" version_id="1010070" version_string="1.1.0"><![CDATA[<xf:title>Create Game Account</xf:title>
 
 <xf:form action="{{ link('login-server/createAccount') }}" id="create_account_form" ajax="true"
          data-redirect="off" class="block" data-skip-overlay-redirect="true" data-xf-init="create-account">
@@ -21,23 +21,27 @@
         <xf:submitrow icon="save" submit="{{ phrase('Save') }}"/>
     </div>
 </xf:form>]]></template>
-  <template type="public" title="login_account" version_id="1000010" version_string="1.0.0 Alpha"><![CDATA[<div class="block">
+  <template type="public" title="login_account" version_id="1010070" version_string="1.1.0"><![CDATA[<xf:set var="$accName" value="{{ $account.AccountName ?: $account.account_name }}" />
+<xf:set var="$accCreated" value="{{ $account.AccountCreateDate ?: $account.created_at }}" />
+<xf:set var="$accActive" value="{{ $account.LastLoginDate ?: $account.last_login }}" />
+
+<div class="block">
     <div class="block-container">
         <div class="block-header">
-            <a data-xf-init="element-tooltip" data-element=".account-info-{{$account.AccountName}}">
-                {{ $account.AccountName }}
+            <a data-xf-init="element-tooltip" data-element=".account-info-{$accName}">
+                {$accName}
             </a>
-            <div class="account-info-{{$account.AccountName}}" style="display:none;">
-                <div>Created: {{ $account.AccountCreateDate }}</div>
-                <div>Active: {{ $account.LastLoginDate }}</div>
+            <div class="account-info-{$accName}" style="display:none;">
+                <div>Created: {$accCreated}</div>
+                <div>Active: {$accActive}</div>
             </div>
             <xf:button class="button--link account-reset-pw" overlay="true"
-                       href="{{ link('login-server/updatePasswordForm', null, {'account_name': $account.AccountName}) }}"
+                       href="{{ link('login-server/updatePasswordForm', null, {'account_name': $accName}) }}"
                        icon="edit">Reset Password
             </xf:button>
         </div>
 
-        <div class="block-row block-row--minor u-muted">
+        <div class="block-row block-row--minor">
             <div id="character-list" class="showelement">
                 <xf:if is="$account.characters">
                     <xf:foreach loop="$account.characters" value="$character">
@@ -45,21 +49,27 @@
                             <h4>{{ $character.name }}</h4>
                             <h5>{{ $character.level }} {{ $character.class_name }}</h5>
                             <h5>{{ $character.zone_name }}</h5>
+                            <xf:if is="{$xf.options.eqemuLogin_enable_migrate}">
+                                <div class="character-actions">
+                                    <xf:button class="button--link button--small" overlay="true"
+                                               href="{{ link('login-server/migrateForm', null, {'character_name': $character.name}) }}"
+                                               icon="refresh">Migrate</xf:button>
+                                </div>
+                            </xf:if>
                         </div>
                     </xf:foreach>
 
                     <xf:else/>
 
-                    <div class="no-characters"><h4>{{ $account.AccountName }} has no characters.</h4></div>
+                    <div class="no-characters"><h4>{$accName} has no characters.</h4></div>
                 </xf:if>
 
                 <div class="clear"></div>
             </div>
         </div>
     </div>
-</div>
-]]></template>
-  <template type="public" title="login_account.css" version_id="1000010" version_string="1.0.0 Alpha"><![CDATA[.account-header {
+</div>]]></template>
+  <template type="public" title="login_account.css" version_id="1010070" version_string="1.1.0"><![CDATA[.account-header {
     padding-left: 10px;
 }
 
@@ -75,31 +85,58 @@ a.account-create {
 }
 
 .no-characters {
-    color: #333;
+    color: @xf-textColor;
     margin: 5px;
     text-align: center;
     float: left;
     width: 325px;
-    border: 1px solid #d8d8d8;
-    background-color: #f7f7f7;
+    border: 1px solid xf-intensify(@xf-contentBg, 15%);
+    background-color: xf-intensify(@xf-contentBg, 5%);
+    padding: 10px 0;
+    border-radius: @xf-borderRadiusMedium;
 }
 
 .character {
-    color: #333;
+    color: @xf-textColor;
     margin: 5px 0 5px 5px;
     text-align: center;
     float: left;
     width: 160px;
-    border: 1px solid #d8d8d8;
-    background-color: #f7f7f7;
+    border: 1px solid xf-intensify(@xf-contentBg, 15%);
+    background-color: xf-intensify(@xf-contentBg, 5%);
+    padding: 12px 8px 8px 8px;
+    border-radius: @xf-borderRadiusMedium;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.character:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+    border-color: xf-intensify(@xf-contentBg, 25%);
+}
+
+.character h4 {
+    margin: 0 0 5px 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: @xf-textColor;
+}
+
+.character h5 {
+    margin: 0 0 4px 0;
+    font-size: 11px;
+    font-weight: normal;
+    color: @xf-textColorMuted;
 }
 
 .account-management-header {
     margin-bottom: 10px;
-    background-color: #f7f7f7;
-    border: 1px solid #d8d8d8;
+    background-color: @xf-contentBg;
+    border: 1px solid @xf-borderColor;
     height: 60px;
     padding-top: 13px;
+    border-radius: @xf-borderRadiusMedium;
 }
 
 a.account-reset-pw {
@@ -112,8 +149,19 @@ button.account-create {
 
 #login_accounts .block {
     margin-bottom: 15px;
+}
+
+.character-actions {
+    margin-top: 5px;
+}
+
+.character-actions .button {
+    font-size: 11px;
+    padding: 3px 8px;
+    height: auto;
+    line-height: 1.2;
 }]]></template>
-  <template type="public" title="login_account.js" version_id="1000010" version_string="1.0.0 Alpha"><![CDATA[jQuery(document).ready(function() {
+  <template type="public" title="login_account.js" version_id="1010070" version_string="1.1.0"><![CDATA[document.addEventListener('DOMContentLoaded', function() {
     !function($, window, document, _undefined)
     {
         "use strict";
@@ -136,9 +184,9 @@ button.account-create {
         });
 
         XF.Element.register('create-account', 'XF.EqemuLogin_CreateAccount');
-    }(jQuery, window, document);
+    }(window.jQuery, window, document);
 });]]></template>
-  <template type="public" title="login_account_index" version_id="1000010" version_string="1.0.0 Alpha"><![CDATA[<xf:title>Game Accounts</xf:title>
+  <template type="public" title="login_account_index" version_id="1010070" version_string="1.1.0"><![CDATA[<xf:title>Game Accounts</xf:title>
 
 
 <div class="account-header account-management-header">
@@ -157,9 +205,9 @@ button.account-create {
     </xf:if>
 </div>
 
-<xf:js src="login_account/login_account.js" addon="EqemuLogin" />
+<xf:js><xf:include template="login_account.js" /></xf:js>
 <xf:css src="login_account.css" addon="EqemuLogin" />]]></template>
-  <template type="public" title="password_form" version_id="1000010" version_string="1.0.0 Alpha"><![CDATA[<xf:title>Update Password for {{ $account_name }}</xf:title>
+  <template type="public" title="password_form" version_id="1010070" version_string="1.1.0"><![CDATA[<xf:title>Update Password for {{ $account_name }}</xf:title>
 
 <xf:form action="{{ link('login-server/updatePassword') }}" id="password_form" ajax="true" data-redirect="off">
     <div class="block-container">
@@ -179,7 +227,7 @@ button.account-create {
         <xf:submitrow icon="save" submit="{{ phrase('Save') }}"/>
     </div>
 </xf:form>]]></template>
-  <template type="public" title="test_route" version_id="1000010" version_string="1.0.0 Alpha"><![CDATA[<xf:title>Test Route</xf:title>
+  <template type="public" title="test_route" version_id="1010070" version_string="1.1.0"><![CDATA[<xf:title>Test Route</xf:title>
 
 <xf:form action="{{ link('login-server/createAccountTest') }}" ajax="true"
          data-redirect="off" class="block" data-skip-overlay-redirect="true" data-xf-init="test-stuff">
@@ -189,6 +237,32 @@ button.account-create {
         </div>
 
         <xf:submitrow icon="add" submit="{{ phrase('add') }}" />
+    </div>
+</xf:form>]]></template>
+  <template type="public" title="migrate_character_form" version_id="1010070" version_string="1.1.0"><![CDATA[<xf:title>Migrate Character: {$character.char_name}</xf:title>
+
+<xf:form action="{{ link('login-server/migrate') }}" id="migrate_character_form" ajax="true" class="block">
+    <div class="block-container">
+        <div class="block-body">
+            <xf:formrow label="Character Name">
+                <strong>{$character.char_name}</strong>
+            </xf:formrow>
+
+            <xf:formrow label="Current Account">
+                {$character.account_name}
+            </xf:formrow>
+
+            <xf:selectrow name="target_account_id" label="Target Account" required="required">
+                <xf:option value="">-- Select Target Account --</xf:option>
+                <xf:foreach loop="$targetAccounts" value="$targetAccount">
+                    <xf:option value="{$targetAccount.id}">{$targetAccount.name}</xf:option>
+                </xf:foreach>
+            </xf:selectrow>
+
+            <input type="hidden" name="character_name" value="{$character.char_name}" />
+        </div>
+
+        <xf:submitrow icon="refresh" submit="Migrate Character" />
     </div>
 </xf:form>]]></template>
 </templates>

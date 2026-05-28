@@ -1,2 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<options/>
+<options>
+  <option option_id="eqemuLogin_enable_migrate" edit_format="onoff" data_type="boolean">
+    <default_value>1</default_value>
+    <relation group_id="eqemuLogin" display_order="5"/>
+  </option>
+  <option option_id="eqemuLogin_migrate_cooldown" edit_format="spinbox" data_type="integer">
+    <default_value>30</default_value>
+    <edit_format_params>min=0
+step=1</edit_format_params>
+    <relation group_id="eqemuLogin" display_order="10"/>
+  </option>
+  <option option_id="eqemuLogin_migrate_offline_duration" edit_format="spinbox" data_type="integer">
+    <default_value>15</default_value>
+    <edit_format_params>min=0
+step=1</edit_format_params>
+    <relation group_id="eqemuLogin" display_order="20"/>
+  </option>
+</options>

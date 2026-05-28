@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <phrases>
   <phrase title="nav.loginserveraccounts" version_id="1000010" version_string="1.0.0 Alpha"><![CDATA[Game Accounts]]></phrase>
+  <phrase title="option_group.eqemuLogin" version_id="1010070" version_string="1.1.0"><![CDATA[EQEmulator Login Server Management]]></phrase>
+  <phrase title="option_group_desc.eqemuLogin" version_id="1010070" version_string="1.1.0"><![CDATA[Configuration options for EQEmulator Login Server Management.]]></phrase>
+  <phrase title="option.eqemuLogin_enable_migrate" version_id="1010070" version_string="1.1.0"><![CDATA[Enable Character Migration]]></phrase>
+  <phrase title="option_explain.eqemuLogin_enable_migrate" version_id="1010070" version_string="1.1.0"><![CDATA[If enabled, players will be allowed to migrate their characters between different game accounts they own.]]></phrase>
+  <phrase title="option.eqemuLogin_migrate_cooldown" version_id="1010070" version_string="1.1.0"><![CDATA[Character Migration Cooldown (Days)]]></phrase>
+  <phrase title="option_explain.eqemuLogin_migrate_cooldown" version_id="1010070" version_string="1.1.0"><![CDATA[The minimum number of days a user must wait between character migrations. Set to 0 to disable cooldown.]]></phrase>
+  <phrase title="option.eqemuLogin_migrate_offline_duration" version_id="1010070" version_string="1.1.0"><![CDATA[Required Offline Duration (Minutes)]]></phrase>
+  <phrase title="option_explain.eqemuLogin_migrate_offline_duration" version_id="1010070" version_string="1.1.0"><![CDATA[The number of minutes a player's characters must be offline before they can be migrated, to prevent data collision. Set to 0 to bypass this check.]]></phrase>
 </phrases>
